@@ -140,3 +140,11 @@ the CLI boundary. A valid unpinned signer is `UNKNOWN`, not trusted.
 
 The public deterministic vector is [classical-v1.txt](../tests/vectors/classical-v1.txt).
 
+## Future paper encoding
+
+Paper/manual transport is a representation above the unchanged binary blob, not
+encryption. A future `encode-paper`/`decode-paper` format should use a human-friendly
+Base32-style alphabet that removes `0/O` and `1/I/l`, groups symbols, and authenticates
+transcription blocks with checksums. It requires its own canonical specification and
+error analysis before implementation.
+

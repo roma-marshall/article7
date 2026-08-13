@@ -140,6 +140,9 @@ fn command_open(paths: &StatePaths, args: &[OsString]) -> Result<()> {
     eprintln!("RECIPIENT: VALID");
     match &letter.sender_trust {
         SenderTrust::Pinned { alias } => eprintln!("SENDER: PINNED ({alias})"),
+        SenderTrust::Mismatch { alias } => {
+            eprintln!("SENDER: MISMATCH ({alias}) — POSSIBLE MITM")
+        }
         SenderTrust::Unknown => {
             eprintln!("SENDER: UNKNOWN — signature is valid but identity is not pinned")
         }

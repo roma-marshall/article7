@@ -34,7 +34,8 @@ cargo build --release --offline --locked
 
 Cargo validates vendored files against each crate's `.cargo-checksum.json`, whose
 package checksum corresponds to the registry checksum in `Cargo.lock`. `verify-build.sh`
-performs two clean release builds and compares their hashes on one host.
+performs two clean release builds at the same controlled path and compares their
+hashes on one host.
 
 Release flags are one codegen unit, fat LTO, optimization level 3, abort-on-panic, and
 symbol stripping. Official target triples are planned as:
@@ -47,6 +48,7 @@ aarch64-unknown-linux-gnu
 x86_64-pc-windows-msvc
 ```
 
-Same-host equality is not proof of cross-platform reproducibility. The project does
-not claim byte-for-byte reproducibility across build hosts until independently tested.
-
+Same-host/same-path equality is not proof of cross-path or cross-platform
+reproducibility. In particular, current Apple linker UUID generation can reflect
+pre-strip path-dependent material. The project does not claim byte-for-byte
+reproducibility across checkout paths or build hosts until independently tested.

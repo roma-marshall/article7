@@ -87,6 +87,32 @@ fn valid_unpinned_sender_is_not_reported_as_trusted() {
 }
 
 #[test]
+fn partially_changed_pinned_identity_is_a_mismatch() {
+    let changed_alice = IdentitySecrets::from_bytes([0x11; 32], [0x23; 32]);
+    let changed_profile = changed_alice.public_profile();
+    let (_, pinned_alice_profile) = alice();
+    let (bob_secrets, bob_profile) = bob();
+    let contact = Contact {
+        alias: "alice".to_owned(),
+        profile: pinned_alice_profile,
+    };
+    let blob = message::seal(
+        &changed_alice,
+        &changed_profile,
+        &bob_profile,
+        b"changed agreement key",
+    )
+    .unwrap();
+    let opened = message::open(&bob_secrets, &bob_profile, &[contact], &blob).unwrap();
+    assert_eq!(
+        opened.sender_trust,
+        SenderTrust::Mismatch {
+            alias: "alice".to_owned()
+        }
+    );
+}
+
+#[test]
 fn wrong_recipient_cannot_open() {
     let (alice_secrets, alice_profile) = alice();
     let (_, bob_profile) = bob();

@@ -64,6 +64,11 @@ impl PublicProfile {
         if profile.fingerprint != supplied_fingerprint {
             return Err(Error::InvalidInput("public profile fingerprint is invalid"));
         }
+        if profile.encode() != bytes {
+            return Err(Error::InvalidInput(
+                "public profile encoding is not canonical",
+            ));
+        }
         Ok(profile)
     }
 
@@ -180,7 +185,11 @@ pub fn parse_unlock_key(bytes: &[u8]) -> Result<Zeroizing<[u8; 32]>> {
     if lines.next().is_some() {
         return Err(Error::InvalidInput("unexpected unlock key field"));
     }
-    Ok(Zeroizing::new(hex_decode(encoded)?))
+    let key = Zeroizing::new(hex_decode(encoded)?);
+    if encode_unlock_key(&key) != bytes {
+        return Err(Error::InvalidInput("unlock key encoding is not canonical"));
+    }
+    Ok(key)
 }
 
 pub fn encrypt_private_identity(
