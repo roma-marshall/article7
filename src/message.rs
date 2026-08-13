@@ -242,3 +242,91 @@ fn random_bytes(length: usize) -> Result<Vec<u8>> {
     crate::entropy::fill_random(&mut bytes)?;
     Ok(bytes)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_aead_with_wrong_recipient_binding_is_rejected() {
+        let alice = IdentitySecrets::from_bytes([0x11; 32], [0x22; 32]);
+        let alice_profile = alice.public_profile();
+        let bob = IdentitySecrets::from_bytes([0x33; 32], [0x44; 32]);
+        let bob_profile = bob.public_profile();
+        let mallory = IdentitySecrets::from_bytes([0x55; 32], [0x66; 32]);
+        let internal = padded_internal(&alice, &alice_profile, &mallory.public_profile());
+        let blob = encrypt_internal_for(&bob_profile, &internal);
+        assert!(open(&bob, &bob_profile, &[], &blob).is_err());
+    }
+
+    #[test]
+    fn valid_aead_with_wrong_signature_is_rejected() {
+        let alice = IdentitySecrets::from_bytes([0x11; 32], [0x22; 32]);
+        let alice_profile = alice.public_profile();
+        let bob = IdentitySecrets::from_bytes([0x33; 32], [0x44; 32]);
+        let bob_profile = bob.public_profile();
+        let mut internal = padded_internal(&alice, &alice_profile, &bob_profile);
+        let signature_offset = 2 + 32 + 32 + 32 + 32 + 4 + b"body".len();
+        internal[signature_offset] ^= 1;
+        let blob = encrypt_internal_for(&bob_profile, &internal);
+        assert!(open(&bob, &bob_profile, &[], &blob).is_err());
+    }
+
+    #[test]
+    fn oversized_claimed_inner_length_is_rejected_without_panic() {
+        let alice = IdentitySecrets::from_bytes([0x11; 32], [0x22; 32]);
+        let alice_profile = alice.public_profile();
+        let bob = IdentitySecrets::from_bytes([0x33; 32], [0x44; 32]);
+        let bob_profile = bob.public_profile();
+        let mut internal = padded_internal(&alice, &alice_profile, &bob_profile);
+        let length_offset = 2 + 32 + 32 + 32 + 32;
+        internal[length_offset..length_offset + 4].copy_from_slice(&u32::MAX.to_be_bytes());
+        assert!(parse_internal(&internal).is_err());
+    }
+
+    fn padded_internal(
+        sender: &IdentitySecrets,
+        sender_profile: &PublicProfile,
+        bound_recipient: &PublicProfile,
+    ) -> Zeroizing<Vec<u8>> {
+        let padding_len = 512 - OUTER_OVERHEAD - INTERNAL_FIXED_LEN - b"body".len();
+        serialize_internal(
+            sender,
+            sender_profile,
+            bound_recipient,
+            &[0x77; 32],
+            b"body",
+            &vec![0x88; padding_len],
+        )
+        .unwrap()
+    }
+
+    fn encrypt_internal_for(recipient: &PublicProfile, internal: &[u8]) -> Vec<u8> {
+        let ephemeral_secret = StaticSecret::from([0x99; 32]);
+        let ephemeral_public = X25519PublicKey::from(&ephemeral_secret).to_bytes();
+        let nonce = [0xaa; NONCE_LEN];
+        let message_key = derive_message_key_sender(
+            &ephemeral_secret,
+            &ephemeral_public,
+            &recipient.agreement_public,
+        )
+        .unwrap();
+        let cipher = XChaCha20Poly1305::new_from_slice(message_key.as_ref()).unwrap();
+        let aad = outer_aad(&ephemeral_public, &nonce);
+        let ciphertext = cipher
+            .encrypt(
+                XNonce::from_slice(&nonce),
+                Payload {
+                    msg: internal,
+                    aad: &aad,
+                },
+            )
+            .unwrap();
+        let mut blob = Vec::with_capacity(512);
+        blob.extend_from_slice(&ephemeral_public);
+        blob.extend_from_slice(&nonce);
+        blob.extend_from_slice(&ciphertext);
+        assert_eq!(blob.len(), 512);
+        blob
+    }
+}

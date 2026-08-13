@@ -32,7 +32,7 @@ fn classical_v1_public_vector_is_stable() {
     )
     .unwrap();
     let recipient_message_key = derive_message_key_recipient(
-        bob.agreement_secret_for_test(),
+        &[0x44; 32],
         &ephemeral_public,
         &bob_profile.agreement_public,
     )
@@ -94,4 +94,3 @@ fn parse_vector(input: &str) -> BTreeMap<&str, &str> {
 fn assert_field(vector: &BTreeMap<&str, &str>, name: &str, actual: &str) {
     assert_eq!(vector.get(name).copied(), Some(actual), "vector field {name}");
 }
-
