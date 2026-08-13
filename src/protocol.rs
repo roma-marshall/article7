@@ -59,4 +59,3 @@ pub fn padded_blob_len(body_len: usize) -> Option<usize> {
 pub fn valid_blob_len(length: usize) -> bool {
     (MIN_BLOB_LEN..=MAX_BLOB_LEN).contains(&length) && length.is_power_of_two()
 }
-

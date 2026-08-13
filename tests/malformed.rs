@@ -46,9 +46,21 @@ fn every_truncation_and_appended_data_is_rejected() {
 #[test]
 fn random_and_boundary_sized_inputs_never_open_or_panic() {
     let (_, _, bob, bob_profile) = identities();
-    for length in [0, 1, 31, 32, 55, 56, 255, 256, 511, 512, 1024, MAX_BLOB_LEN + 1] {
+    for length in [
+        0,
+        1,
+        31,
+        32,
+        55,
+        56,
+        255,
+        256,
+        511,
+        512,
+        1024,
+        MAX_BLOB_LEN + 1,
+    ] {
         let input = vec![0x5a; length];
         assert!(message::open(&bob, &bob_profile, &[], &input).is_err());
     }
 }
-

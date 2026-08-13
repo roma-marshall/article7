@@ -250,4 +250,3 @@ fn parse_field<const N: usize>(line: Option<&str>, prefix: &'static str) -> Resu
         .ok_or(Error::InvalidInput("invalid public profile field"))?;
     hex_decode(encoded)
 }
-

@@ -266,4 +266,3 @@ fn set_private_permissions(path: &Path) -> Result<()> {
 fn set_private_permissions(_path: &Path) -> Result<()> {
     Ok(())
 }
-

@@ -51,8 +51,9 @@ pub fn seal(
     let ephemeral_public = X25519PublicKey::from(&ephemeral_secret).to_bytes();
     let nonce = random_array::<NONCE_LEN>()?;
     let message_id = random_array::<32>()?;
-    let blob_len = padded_blob_len(body.len())
-        .ok_or(Error::InvalidInput("message cannot fit a supported padding bucket"))?;
+    let blob_len = padded_blob_len(body.len()).ok_or(Error::InvalidInput(
+        "message cannot fit a supported padding bucket",
+    ))?;
     let plaintext_len = blob_len - OUTER_OVERHEAD;
     let padding_len = plaintext_len - INTERNAL_FIXED_LEN - body.len();
     let padding = Zeroizing::new(random_bytes(padding_len)?);
@@ -123,8 +124,8 @@ pub fn open(
         &recipient_profile.agreement_public,
     )
     .map_err(|_| Error::CannotOpen)?;
-    let cipher = XChaCha20Poly1305::new_from_slice(message_key.as_ref())
-        .map_err(|_| Error::CannotOpen)?;
+    let cipher =
+        XChaCha20Poly1305::new_from_slice(message_key.as_ref()).map_err(|_| Error::CannotOpen)?;
     let aad = outer_aad(&ephemeral_public, &nonce);
     let plaintext = cipher
         .decrypt(
@@ -176,8 +177,8 @@ pub fn serialize_internal(
     if body.len() > MAX_BODY_LEN {
         return Err(Error::InvalidInput("message body exceeds the 1 MiB limit"));
     }
-    let body_len = u32::try_from(body.len())
-        .map_err(|_| Error::InvalidInput("message body is too large"))?;
+    let body_len =
+        u32::try_from(body.len()).map_err(|_| Error::InvalidInput("message body is too large"))?;
     let signature = sign_message(
         sender_secrets,
         sender_profile,
@@ -241,4 +242,3 @@ fn random_bytes(length: usize) -> Result<Vec<u8>> {
     crate::entropy::fill_random(&mut bytes)?;
     Ok(bytes)
 }
-

@@ -24,8 +24,7 @@ fn bob() -> (IdentitySecrets, sealed::identity::PublicProfile) {
 fn contact_and_stego_derivations_are_symmetric() {
     let (alice_secrets, alice_profile) = alice();
     let (bob_secrets, bob_profile) = bob();
-    let alice_root =
-        derive_contact_root(&alice_secrets, &alice_profile, &bob_profile).unwrap();
+    let alice_root = derive_contact_root(&alice_secrets, &alice_profile, &bob_profile).unwrap();
     let bob_root = derive_contact_root(&bob_secrets, &bob_profile, &alice_profile).unwrap();
     assert_eq!(*alice_root, *bob_root);
     assert_eq!(
@@ -39,7 +38,12 @@ fn encrypted_private_identity_round_trips_and_rejects_tampering() {
     let (secrets, profile) = alice();
     let unlock = [0xa5; 32];
     let encrypted = encrypt_private_identity(&secrets, &unlock).unwrap();
-    assert_eq!(decrypt_private_identity(&encrypted, &unlock).unwrap().public_profile(), profile);
+    assert_eq!(
+        decrypt_private_identity(&encrypted, &unlock)
+            .unwrap()
+            .public_profile(),
+        profile
+    );
 
     for index in 0..encrypted.len() {
         let mut tampered = encrypted.clone();
@@ -106,4 +110,3 @@ fn oversized_body_is_rejected_without_allocation() {
     let body = vec![0_u8; MAX_BODY_LEN + 1];
     assert!(message::seal(&alice_secrets, &alice_profile, &bob_profile, &body).is_err());
 }
-

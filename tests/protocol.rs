@@ -3,8 +3,7 @@
 use sealed::identity::{IdentitySecrets, PublicProfile};
 use sealed::message::serialize_internal;
 use sealed::protocol::{
-    INTERNAL_FIXED_LEN, MAX_BODY_LEN, MIN_BLOB_LEN, OUTER_OVERHEAD, padded_blob_len,
-    valid_blob_len,
+    INTERNAL_FIXED_LEN, MAX_BODY_LEN, MIN_BLOB_LEN, OUTER_OVERHEAD, padded_blob_len, valid_blob_len,
 };
 
 #[test]
@@ -60,4 +59,3 @@ fn internal_serialization_is_deterministic() {
     .unwrap();
     assert_eq!(*first, *second);
 }
-

@@ -96,7 +96,9 @@ fn command_seal(paths: &StatePaths, args: &[OsString]) -> Result<()> {
     let unlock_path = resolve_unlock_path(unlock_path, false)?;
     let (secrets, profile) = paths.load_identity(&unlock_path)?;
     if io::stdin().is_terminal() {
-        eprintln!("Enter the letter body, then send EOF (Ctrl-D on Unix, Ctrl-Z then Enter on Windows):");
+        eprintln!(
+            "Enter the letter body, then send EOF (Ctrl-D on Unix, Ctrl-Z then Enter on Windows):"
+        );
     }
     let mut body = zeroize::Zeroizing::new(Vec::new());
     io::stdin()
@@ -138,7 +140,9 @@ fn command_open(paths: &StatePaths, args: &[OsString]) -> Result<()> {
     eprintln!("RECIPIENT: VALID");
     match &letter.sender_trust {
         SenderTrust::Pinned { alias } => eprintln!("SENDER: PINNED ({alias})"),
-        SenderTrust::Unknown => eprintln!("SENDER: UNKNOWN — signature is valid but identity is not pinned"),
+        SenderTrust::Unknown => {
+            eprintln!("SENDER: UNKNOWN — signature is valid but identity is not pinned")
+        }
     }
     eprintln!(
         "SENDER FINGERPRINT: {}",
@@ -160,7 +164,12 @@ fn parse_options(
     args: &[OsString],
     allow_name: bool,
     allow_output: bool,
-) -> Result<(Vec<OsString>, Option<PathBuf>, Option<String>, Option<PathBuf>)> {
+) -> Result<(
+    Vec<OsString>,
+    Option<PathBuf>,
+    Option<String>,
+    Option<PathBuf>,
+)> {
     let mut positionals = Vec::new();
     let mut unlock_path = None;
     let mut alias = None;
@@ -268,4 +277,3 @@ fn terminal_input() -> Result<File> {
         "supply --unlock-key PATH on this platform",
     ))
 }
-
