@@ -2,7 +2,7 @@
 .
 /target/
 /.sealed-test/
+/.sealed-local/
 dist/*/sealed
 dist/*/sealed.exe
 *.tmp
-

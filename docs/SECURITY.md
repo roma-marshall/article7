@@ -16,9 +16,13 @@ uses create-new semantics for secrets and contacts, applies mode 0600 to files a
 hardening remains a platform-specific audit item; ordinary Rust permission APIs do not
 provide an equivalent Unix-mode guarantee.
 
+On Unix, the optional interactive selector invokes the system `/bin/stty` utility only
+to capture arrow keys from `/dev/tty`; it restores the prior terminal mode on normal
+return and uses numeric selection if raw terminal setup fails. This UI boundary is
+outside the cryptographic core and has no network capability.
+
 Do not report a blob parsing detail as a public CLI error. Pre-authentication and
 post-authentication malformed-message failures intentionally collapse to
 `Cannot open blob.`. Developer diagnostics must not print secrets if later added.
 
 See the repository [SECURITY.md](../SECURITY.md) for vulnerability reporting.
-

@@ -45,7 +45,28 @@ and [protocol bytes](docs/PROTOCOL.md) before evaluating or using the software.
 Release bundles may include a tiny `./sealed` or `sealed.cmd` launcher plus the
 appropriate prebuilt native binary under `dist/`. The launcher performs no download
 or installation. This source tree does not pretend that unbuilt cross-platform
-binaries are present.
+binaries are present. After a source build, simply launch the guided terminal:
+
+```sh
+./build.sh
+./sealed
+```
+
+Running `./sealed` without arguments opens an interactive menu that shows identity
+status and pinned contacts, then guides the user through identity creation, profile
+exchange, contact verification, sealing, and opening. Letters can be entered as
+multiple lines; a line containing only `.` finishes the body. Use ↑/↓ and Enter to
+choose menu items and contacts; `j`/`k` also work. On Unix this uses the local
+`/bin/stty` terminal utility solely for temporary key capture and falls back to numeric
+selection if raw terminal input is unavailable. ANSI colors are disabled when `NO_COLOR`
+is set.
+
+The first identity wizard proposes `./.sealed-local/unlock.key` automatically. This
+ignored directory makes a clone-and-test flow simple, but it is **not** the recommended
+storage location for real use: choose a separate removable/offline location for the
+unlock key instead.
+
+The explicit commands remain available for scripts and advanced use:
 
 ```sh
 # Create an identity. Choose an unlock-key path on separate media when prompted.
@@ -104,4 +125,3 @@ the source is designed for independent audit, not trust in its authors or genera
 code.
 
 Licensed under the MIT License.
-
