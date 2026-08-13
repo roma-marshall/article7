@@ -9,11 +9,21 @@ use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::process::{Command, Stdio};
 use zeroize::Zeroizing;
 
 const USAGE: &str = "Usage:\n  sealed                         Interactive terminal\n  sealed init [--unlock-key PATH]\n  sealed identity export\n  sealed trust PROFILE [--name NAME]\n  sealed seal CONTACT [--unlock-key PATH] [--output BLOB]\n  sealed open BLOB [--unlock-key PATH] [--keep]";
 
-const MENU: &str = "  1  Create identity\n  2  Export public profile\n  3  Add or verify contact\n  4  Seal a letter\n  5  Open a letter\n  6  Show identity and contacts\n  0  Exit";
+const MENU_ITEMS: [&str; 7] = [
+    "Create identity",
+    "Export public profile",
+    "Add or verify contact",
+    "Seal a letter",
+    "Open a letter",
+    "Show identity and contacts",
+    "Exit",
+];
 
 pub fn run() -> Result<()> {
     let mut args = env::args_os();
@@ -51,23 +61,18 @@ fn interactive() -> Result<()> {
 
     loop {
         print_state_summary(&paths, &style);
-        eprintln!("\n{MENU}\n");
-        let choice = prompt("Choose an action", Some("0"))?;
-        let action = match choice.trim() {
-            "1" => wizard_init(&paths, &style),
-            "2" => wizard_export(&paths, &style),
-            "3" => wizard_trust(&paths, &style),
-            "4" => wizard_seal(&paths, &style),
-            "5" => wizard_open(&paths, &style),
-            "6" => wizard_show(&paths, &style),
-            "0" | "q" | "quit" | "exit" => {
+        let action = match choose_from_list("Choose an action", &MENU_ITEMS, &style)? {
+            Some(0) => wizard_init(&paths, &style),
+            Some(1) => wizard_export(&paths, &style),
+            Some(2) => wizard_trust(&paths, &style),
+            Some(3) => wizard_seal(&paths, &style),
+            Some(4) => wizard_open(&paths, &style),
+            Some(5) => wizard_show(&paths, &style),
+            Some(6) | None => {
                 eprintln!("\n{} Goodbye.\n", style.dim("•"));
                 return Ok(());
             }
-            _ => {
-                eprintln!("\n{} Enter a number from 0 to 6.\n", style.warning());
-                continue;
-            }
+            Some(_) => return Err(Error::InvalidInput("invalid menu selection")),
         };
 
         match action {
@@ -109,21 +114,36 @@ fn print_state_summary(paths: &StatePaths, style: &TerminalStyle) {
 fn wizard_init(paths: &StatePaths, style: &TerminalStyle) -> Result<()> {
     eprintln!("\n{}", style.bold("Create identity"));
     eprintln!("The encrypted identity stays in: {}", paths.root.display());
-    eprintln!("Store the unlock key separately. Losing it is permanent.");
-    let unlock_path = prompt_path("Unlock-key file path", None)?;
+    let default_unlock_path = project_local_unlock_path()?;
+    let default_unlock = default_unlock_path.display().to_string();
+    eprintln!("For easy local testing, the default key location is inside this clone.");
+    eprintln!(
+        "{} For real use, use removable or separate storage instead.",
+        style.warning()
+    );
+    let unlock_path = prompt_path("Unlock-key file path", Some(&default_unlock))?;
     let parent = unlock_path
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
     if !parent.exists() {
-        let create = prompt_yes_no(
-            &format!("Directory {} does not exist. Create it?", parent.display()),
-            true,
-        )?;
-        if !create {
-            return Err(Error::InvalidInput("identity creation cancelled"));
+        if unlock_path == default_unlock_path {
+            fs::create_dir_all(parent)?;
+            eprintln!(
+                "{} Created local test-key directory: {}",
+                style.dim("→"),
+                parent.display()
+            );
+        } else {
+            let create = prompt_yes_no(
+                &format!("Directory {} does not exist. Create it?", parent.display()),
+                true,
+            )?;
+            if !create {
+                return Err(Error::InvalidInput("identity creation cancelled"));
+            }
+            fs::create_dir_all(parent)?;
         }
-        fs::create_dir_all(parent)?;
     }
     eprintln!(
         "{} Generating keys from the operating-system CSPRNG...",
@@ -180,21 +200,21 @@ fn wizard_seal(paths: &StatePaths, style: &TerminalStyle) -> Result<()> {
             "no pinned contacts; import a public profile with option 3",
         ));
     }
-    for (index, contact) in contacts.iter().enumerate() {
-        eprintln!(
-            "  {}  {}  {}",
-            index + 1,
-            contact.alias,
-            style.dim(&short_fingerprint(&contact.profile))
-        );
-    }
-    let selected = prompt("Recipient number", None)?;
-    let selected = selected
-        .parse::<usize>()
-        .ok()
-        .and_then(|number| number.checked_sub(1))
-        .and_then(|index| contacts.get(index))
-        .ok_or(Error::InvalidInput("invalid recipient number"))?;
+    let contact_options: Vec<String> = contacts
+        .iter()
+        .map(|contact| {
+            format!(
+                "{}  ·  {}",
+                contact.alias,
+                short_fingerprint(&contact.profile)
+            )
+        })
+        .collect();
+    let selected_index = choose_from_list("Choose recipient", &contact_options, style)?
+        .ok_or(Error::InvalidInput("recipient selection cancelled"))?;
+    let selected = contacts
+        .get(selected_index)
+        .ok_or(Error::InvalidInput("invalid recipient selection"))?;
     let unlock_path = prompt_unlock_path(false)?;
     let output_default = format!("letter-for-{}.bin", selected.alias);
     let output_path = prompt_path("Save encrypted letter as", Some(&output_default))?;
@@ -308,6 +328,90 @@ fn short_fingerprint(profile: &PublicProfile) -> String {
     format!("{}…", full.chars().take(19).collect::<String>())
 }
 
+fn choose_from_list<T: AsRef<str>>(
+    title: &str,
+    choices: &[T],
+    style: &TerminalStyle,
+) -> Result<Option<usize>> {
+    if choices.is_empty() {
+        return Err(Error::InvalidInput("there is nothing to select"));
+    }
+
+    #[cfg(unix)]
+    if let Ok(mut terminal) = RawTerminal::enter() {
+        eprintln!("\n{}", style.bold(title));
+        eprintln!("{}", style.dim("Use ↑/↓ and Enter. Ctrl-C cancels."));
+        let mut selected = 0;
+        draw_picker(choices, selected, style, false)?;
+        loop {
+            match read_picker_key(&mut terminal)? {
+                PickerKey::Up => selected = selected.checked_sub(1).unwrap_or(choices.len() - 1),
+                PickerKey::Down => selected = (selected + 1) % choices.len(),
+                PickerKey::Select => {
+                    eprintln!();
+                    return Ok(Some(selected));
+                }
+                PickerKey::Cancel => {
+                    eprintln!();
+                    return Ok(None);
+                }
+                PickerKey::Ignore => continue,
+            }
+            draw_picker(choices, selected, style, true)?;
+        }
+    }
+
+    eprintln!("\n{}", style.bold(title));
+    eprintln!(
+        "{}",
+        style.dim("Arrow navigation is unavailable; enter a number.")
+    );
+    for (index, choice) in choices.iter().enumerate() {
+        eprintln!("  {}  {}", index + 1, choice.as_ref());
+    }
+    let selected = prompt("Selection", None)?;
+    selected
+        .parse::<usize>()
+        .ok()
+        .and_then(|number| number.checked_sub(1))
+        .filter(|index| *index < choices.len())
+        .map(Some)
+        .ok_or(Error::InvalidInput("invalid selection"))
+}
+
+fn draw_picker<T: AsRef<str>>(
+    choices: &[T],
+    selected: usize,
+    style: &TerminalStyle,
+    redraw: bool,
+) -> Result<()> {
+    if redraw {
+        eprint!("\x1b[{}A", choices.len());
+    }
+    for (index, choice) in choices.iter().enumerate() {
+        eprint!("\r\x1b[2K");
+        if index == selected {
+            eprintln!(
+                "  {} {}",
+                style.selected("›"),
+                style.selected(choice.as_ref())
+            );
+        } else {
+            eprintln!("    {}", choice.as_ref());
+        }
+    }
+    io::stderr().flush()?;
+    Ok(())
+}
+
+fn project_local_unlock_path() -> Result<PathBuf> {
+    let project_dir = match env::var_os("SEALED_PROJECT_DIR") {
+        Some(path) => PathBuf::from(path),
+        None => env::current_dir()?,
+    };
+    Ok(project_dir.join(".sealed-local").join("unlock.key"))
+}
+
 fn prompt(label: &str, default: Option<&str>) -> Result<String> {
     match default {
         Some(value) => eprint!("{label} [{value}]: "),
@@ -408,6 +512,85 @@ fn home_directory() -> Result<PathBuf> {
         .ok_or(Error::NotFound("home directory is unavailable"))
 }
 
+#[cfg(unix)]
+struct RawTerminal {
+    input: File,
+    saved_mode: String,
+}
+
+#[cfg(unix)]
+impl RawTerminal {
+    fn enter() -> Result<Self> {
+        let input = File::open("/dev/tty")?;
+        let saved_mode = stty(&["-g"])?;
+        if let Err(error) = stty(&["-icanon", "min", "1", "time", "0", "-echo", "-isig"]) {
+            restore_stty(&saved_mode);
+            return Err(error);
+        }
+        Ok(Self { input, saved_mode })
+    }
+}
+
+#[cfg(unix)]
+impl Drop for RawTerminal {
+    fn drop(&mut self) {
+        restore_stty(&self.saved_mode);
+    }
+}
+
+#[cfg(unix)]
+fn stty(arguments: &[&str]) -> Result<String> {
+    let output = Command::new("/bin/stty")
+        .stdin(Stdio::inherit())
+        .args(arguments)
+        .output()?;
+    if !output.status.success() {
+        return Err(Error::InvalidInput("cannot configure terminal key input"));
+    }
+    String::from_utf8(output.stdout)
+        .map(|value| value.trim().to_owned())
+        .map_err(|_| Error::InvalidInput("terminal returned invalid settings"))
+}
+
+#[cfg(unix)]
+fn restore_stty(saved_mode: &str) {
+    let _ = Command::new("/bin/stty")
+        .stdin(Stdio::inherit())
+        .arg(saved_mode)
+        .status();
+}
+
+#[cfg(unix)]
+enum PickerKey {
+    Up,
+    Down,
+    Select,
+    Cancel,
+    Ignore,
+}
+
+#[cfg(unix)]
+fn read_picker_key(terminal: &mut RawTerminal) -> Result<PickerKey> {
+    let mut first = [0_u8; 1];
+    terminal.input.read_exact(&mut first)?;
+    match first[0] {
+        b'\r' | b'\n' => Ok(PickerKey::Select),
+        0x03 => Ok(PickerKey::Cancel),
+        b'k' => Ok(PickerKey::Up),
+        b'j' => Ok(PickerKey::Down),
+        0x1b => {
+            let mut sequence = [0_u8; 2];
+            terminal.input.read_exact(&mut sequence)?;
+            match sequence {
+                [b'[', b'A'] | [b'O', b'A'] => Ok(PickerKey::Up),
+                [b'[', b'B'] | [b'O', b'B'] => Ok(PickerKey::Down),
+                _ => Ok(PickerKey::Ignore),
+            }
+        }
+        _ => Ok(PickerKey::Ignore),
+    }
+}
+
 struct TerminalStyle {
     color: bool,
 }
@@ -437,6 +620,10 @@ impl TerminalStyle {
 
     fn failure(&self) -> String {
         self.paint("31", "×")
+    }
+
+    fn selected(&self, text: &str) -> String {
+        self.paint("36;1", text)
     }
 
     fn paint(&self, code: &str, text: &str) -> String {
