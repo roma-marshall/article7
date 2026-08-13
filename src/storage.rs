@@ -46,6 +46,11 @@ impl StatePaths {
     }
 
     pub fn initialize(&self, unlock_path: &Path) -> Result<PublicProfile> {
+        if unlock_path.starts_with(&self.root) {
+            return Err(Error::InvalidInput(
+                "unlock key must be stored outside the Sealed state directory",
+            ));
+        }
         reject_existing(&self.identity_public, "identity already exists")?;
         reject_existing(&self.identity_encrypted, "identity already exists")?;
         reject_existing(unlock_path, "unlock key destination already exists")?;

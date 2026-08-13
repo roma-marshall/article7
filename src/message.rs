@@ -19,6 +19,7 @@ use zeroize::Zeroizing;
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SenderTrust {
     Pinned { alias: String },
+    Mismatch { alias: String },
     Unknown,
 }
 
@@ -150,13 +151,23 @@ pub fn open(
     )
     .map_err(|_| Error::CannotOpen)?;
 
-    let sender_trust = contacts
+    let sender_trust = if let Some(contact) = contacts
         .iter()
         .find(|contact| contact.profile == parsed.sender)
-        .map(|contact| SenderTrust::Pinned {
+    {
+        SenderTrust::Pinned {
             alias: contact.alias.clone(),
-        })
-        .unwrap_or(SenderTrust::Unknown);
+        }
+    } else if let Some(contact) = contacts.iter().find(|contact| {
+        contact.profile.identity_public == parsed.sender.identity_public
+            || contact.profile.agreement_public == parsed.sender.agreement_public
+    }) {
+        SenderTrust::Mismatch {
+            alias: contact.alias.clone(),
+        }
+    } else {
+        SenderTrust::Unknown
+    };
 
     Ok(OpenedLetter {
         body: parsed.body,
