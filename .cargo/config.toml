@@ -6,4 +6,3 @@ directory = "vendor"
 
 [net]
 offline = true
-
