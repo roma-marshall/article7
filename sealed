@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+case "$(uname -s)" in
+    Darwin) platform=macos ;;
+    Linux) platform=linux ;;
+    *) echo "sealed: unsupported operating system" >&2; exit 1 ;;
+esac
+case "$(uname -m)" in
+    arm64|aarch64) architecture=arm64 ;;
+    x86_64|amd64) architecture=x64 ;;
+    *) echo "sealed: unsupported architecture" >&2; exit 1 ;;
+esac
+
+binary="$project_dir/dist/$platform-$architecture/sealed"
+if [ ! -x "$binary" ]; then
+    echo "sealed: bundled binary is missing: $binary" >&2
+    echo "Build from vendored source with ./build.sh or obtain a verified release bundle." >&2
+    exit 1
+fi
+exec "$binary" "$@"
+

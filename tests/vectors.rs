@@ -3,8 +3,8 @@
 use chacha20poly1305::aead::{Aead, Payload};
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305, XNonce};
 use sealed::crypto::{
-    derive_contact_root, derive_message_key_recipient, derive_message_key_sender,
-    derive_stego_key, outer_aad,
+    derive_contact_root, derive_message_key_recipient, derive_message_key_sender, derive_stego_key,
+    outer_aad,
 };
 use sealed::format::hex_encode;
 use sealed::identity::IdentitySecrets;
@@ -69,8 +69,16 @@ fn classical_v1_public_vector_is_stable() {
     blob.extend_from_slice(&nonce);
     blob.extend_from_slice(&ciphertext);
 
-    assert_field(&vector, "alice_fingerprint", &hex_encode(&alice_profile.fingerprint));
-    assert_field(&vector, "bob_fingerprint", &hex_encode(&bob_profile.fingerprint));
+    assert_field(
+        &vector,
+        "alice_fingerprint",
+        &hex_encode(&alice_profile.fingerprint),
+    );
+    assert_field(
+        &vector,
+        "bob_fingerprint",
+        &hex_encode(&bob_profile.fingerprint),
+    );
     assert_field(&vector, "contact_root", &hex_encode(contact_root.as_ref()));
     assert_field(&vector, "stego_key", &hex_encode(stego_key.as_ref()));
     assert_field(&vector, "ephemeral_public", &hex_encode(&ephemeral_public));
@@ -92,5 +100,9 @@ fn parse_vector(input: &str) -> BTreeMap<&str, &str> {
 }
 
 fn assert_field(vector: &BTreeMap<&str, &str>, name: &str, actual: &str) {
-    assert_eq!(vector.get(name).copied(), Some(actual), "vector field {name}");
+    assert_eq!(
+        vector.get(name).copied(),
+        Some(actual),
+        "vector field {name}"
+    );
 }

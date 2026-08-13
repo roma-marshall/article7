@@ -61,4 +61,3 @@ fn test_directory() -> PathBuf {
         u64::from_be_bytes(random)
     ))
 }
-
