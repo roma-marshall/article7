@@ -20,9 +20,7 @@ impl fmt::Display for Error {
         match self {
             Self::Authentication => formatter.write_str("authentication failed"),
             Self::CannotOpen => formatter.write_str("Cannot open blob."),
-            Self::IdentityMismatch => {
-                formatter.write_str("IDENTITY MISMATCH\nPOSSIBLE MITM")
-            }
+            Self::IdentityMismatch => formatter.write_str("IDENTITY MISMATCH\nPOSSIBLE MITM"),
             Self::InvalidInput(message) => formatter.write_str(message),
             Self::Io(error) => write!(formatter, "I/O error: {error}"),
             Self::NotFound(message) => formatter.write_str(message),
@@ -46,4 +44,3 @@ impl From<io::Error> for Error {
         Self::Io(error)
     }
 }
-

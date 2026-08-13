@@ -17,7 +17,9 @@ pub fn derive_contact_root(
     peer_profile: &PublicProfile,
 ) -> Result<Zeroizing<[u8; 32]>> {
     if local_secrets.public_profile() != *local_profile {
-        return Err(Error::InvalidInput("local public profile does not match private identity"));
+        return Err(Error::InvalidInput(
+            "local public profile does not match private identity",
+        ));
     }
     let local_secret = StaticSecret::from(*local_secrets.agreement_secret());
     let peer_public = X25519PublicKey::from(peer_profile.agreement_public);
@@ -79,8 +81,8 @@ pub fn signature_input(
     message_id: &[u8; 32],
     body: &[u8],
 ) -> Result<Vec<u8>> {
-    let body_len = u32::try_from(body.len())
-        .map_err(|_| Error::InvalidInput("message body is too large"))?;
+    let body_len =
+        u32::try_from(body.len()).map_err(|_| Error::InvalidInput("message body is too large"))?;
     let mut input = Vec::with_capacity(SIGNATURE_DOMAIN.len() + 134 + body.len());
     input.extend_from_slice(SIGNATURE_DOMAIN);
     input.push(PROTOCOL_VERSION);
@@ -102,7 +104,9 @@ pub fn sign_message(
     body: &[u8],
 ) -> Result<[u8; 64]> {
     if secrets.public_profile() != *sender {
-        return Err(Error::InvalidInput("sender public profile does not match private identity"));
+        return Err(Error::InvalidInput(
+            "sender public profile does not match private identity",
+        ));
     }
     let input = signature_input(sender, recipient_fingerprint, message_id, body)?;
     let signing_key = SigningKey::from_bytes(secrets.identity_secret());
@@ -160,4 +164,3 @@ fn reject_all_zero(shared: &[u8; 32]) -> Result<()> {
         Ok(())
     }
 }
-

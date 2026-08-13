@@ -11,4 +11,3 @@ pub trait StegoEncoder {
 pub trait StegoDecoder {
     fn decode(&self, stego_key: &[u8; 32], cover_text: &[u8]) -> Result<Vec<u8>>;
 }
-

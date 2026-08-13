@@ -74,4 +74,3 @@ impl<'a> Reader<'a> {
         self.input.len() - self.offset
     }
 }
-

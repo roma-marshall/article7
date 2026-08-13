@@ -13,4 +13,3 @@ pub fn validate_alias(alias: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
-

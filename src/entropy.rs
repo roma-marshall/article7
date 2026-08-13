@@ -32,4 +32,3 @@ pub fn root_seed(additional: Option<&mut dyn AdditionalEntropySource>) -> Result
     human_bytes.zeroize();
     Ok(digest.into())
 }
-
