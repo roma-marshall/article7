@@ -2,6 +2,9 @@
 set -eu
 
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -z "${SEALED_PROJECT_DIR+x}" ]; then
+    export SEALED_PROJECT_DIR="$project_dir"
+fi
 case "$(uname -s)" in
     Darwin) platform=macos ;;
     Linux) platform=linux ;;
@@ -20,4 +23,3 @@ if [ ! -x "$binary" ]; then
     exit 1
 fi
 exec "$binary" "$@"
-
